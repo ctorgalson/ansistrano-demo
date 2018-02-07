@@ -1,0 +1,16 @@
+---
+# Deployment playbook. Run with `ansible-playbook deploy.yml`.
+- hosts:
+    - ansistrano_issue
+
+  vars:
+    # Ansible.
+    ansible_ssh_user: "user1"
+    ansible_ssh_private_key_file: "{{ playbook_dir }}/keys/user1"
+
+    # Ansistrano.
+    ansistrano_deploy_from: "{{ playbook_dir }}/docroot"
+    ansistrano_deploy_to: "/var/www/html"
+
+  roles:
+    - carlosbuenosvinos.ansistrano-deploy

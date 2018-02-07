@@ -1,0 +1,82 @@
+---
+# This playbook sets up an original codition to compare a deployment against.
+#
+# Runs on `vagrant up`, `vagrant up --provision`, and `vagrant provision`.
+- hosts: all
+  become: true
+
+  vars:
+    # Users.
+    users:
+      - name: user1
+        # Password is "ansistrano1".
+        password: "$6$oeWpiTyqqFP3elsM$Kou3as3apZweeNHoRXuzgQ0j93.MOTygOMmeM3wwU5lXbLGnoRXsFKMGqxT.Ak.7Nzrr/HSPXXMumb7BYRuFC0"
+
+    # geerlingguy.apache.
+    apache_remove_default_vhost: true
+    apache_vhosts:
+      - servername: "ansistrano-demo.local"
+        documentroot: "/var/www/html/current/docroot"
+
+  pre_tasks:
+    - name: Create users and copy their keys into place.
+      block:
+        - name: Create users.
+          user:
+            name: "{{ item.name }}"
+            password: "{{ item.password }}"
+          with_items: "{{ users }}"
+
+        - name: Create ssh directories for each user.
+          file:
+            path: "/home/{{ item.name }}/.ssh"
+            state: directory
+            owner: "{{ item.name }}"
+            group: "{{ item.name }}"
+            mode: "u=rwx,go="
+          with_items: "{{ users }}"
+
+        - name: Copy keys to remote server.
+          copy:
+            src: "keys/{{ item.name }}.pub"
+            dest: "/home/{{ item.name }}/.ssh/authorized_keys"
+            owner: "{{ item.name }}"
+            group: "{{ item.name }}"
+            mode: "u=rw,go="
+          with_items: "{{ users }}"
+
+    - name: Set up default site.
+      block:
+        - name: Remove default index.html file.
+          file:
+            path: "/var/www/html/index.html"
+            state: absent
+
+        - name: Create directory structure and adjust permissions.
+          file:
+            path: "{{ item }}"
+            state: directory
+            recurse: true
+            owner: "user1"
+            group: "user1"
+          with_items:
+            - "/var/www/html"
+            - "/var/www/html/releases/original/docroot"
+            - "/var/www/html/shared"
+
+        - name: Create new index.html file.
+          lineinfile:
+            path: "/var/www/html/releases/original/docroot/index.html"
+            line: "<h1>Original Content</h1>"
+            owner: "user1"
+            group: "user1"
+            create: yes
+
+        - name: Symlink original release directory.
+          file:
+            src: "/var/www/html/releases/original"
+            dest: "/var/www/html/current"
+            state: link
+
+  roles:
+    - geerlingguy.apache
